@@ -30,7 +30,7 @@ export function rdapUrlFor(query: string): string {
   if (!classified.ok) throw new Error(classified.message);
 
   if (classified.kind === 'ip') {
-    return `https://rdap.org/ip/${encodeURIComponent(classified.value)}`;
+    return `https://rdap.org/ip/${classified.value}`;
   }
   if (classified.kind === 'autnum') {
     return `https://rdap.org/autnum/${encodeURIComponent(classified.value)}`;

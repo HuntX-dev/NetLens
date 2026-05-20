@@ -50,8 +50,14 @@ describe('rdapUrlFor', () => {
   it('routes RDAP queries through rdap.org by classified kind', () => {
     expect(rdapUrlFor('example.com')).toBe('https://rdap.org/domain/example.com');
     expect(rdapUrlFor('1.1.1.1')).toBe('https://rdap.org/ip/1.1.1.1');
-    expect(rdapUrlFor('2606:4700:4700::1111')).toBe('https://rdap.org/ip/2606%3A4700%3A4700%3A%3A1111');
+    expect(rdapUrlFor('2606:4700:4700::1111')).toBe('https://rdap.org/ip/2606:4700:4700::1111');
     expect(rdapUrlFor('AS13335')).toBe('https://rdap.org/autnum/13335');
+  });
+});
+
+describe('RDAP upstream URL compatibility', () => {
+  it('keeps IPv6 colons literal because rdap.org rejects encoded IPv6 paths', () => {
+    expect(rdapUrlFor('2606:4700:4700::1111')).not.toContain('%3A');
   });
 });
 

@@ -3,3 +3,5 @@ node_modules/
 .wrangler/
 .wrangler-dev.*.log
 .wrangler-dev.pid
+.wrangler-smoke*.log
+.wrangler-smoke*.pid
