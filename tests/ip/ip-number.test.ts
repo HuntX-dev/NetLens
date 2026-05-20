@@ -20,6 +20,13 @@ describe('ipToRangeKey', () => {
     expect(key.key).toHaveLength(39);
   });
 
+  it('converts IPv6 with a dotted IPv4 tail', () => {
+    const key = ipToRangeKey('::ffff:192.0.2.128');
+
+    expect(key).toEqual({ version: 6, key: '000000000000000000000000281473902969472' });
+    expect(key.key).toHaveLength(39);
+  });
+
   it('supports the max IPv6 key without truncation', () => {
     const key = ipToRangeKey('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff');
 
