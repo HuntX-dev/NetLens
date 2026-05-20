@@ -20,6 +20,7 @@ jobs:
           MAXMIND_ACCOUNT_ID: ${{ secrets.MAXMIND_ACCOUNT_ID }}
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
         run: |
+          set -euo pipefail
           mkdir -p tmp/maxmind
           curl --fail --location --user "$MAXMIND_ACCOUNT_ID:$MAXMIND_LICENSE_KEY" \
             "https://download.maxmind.com/geoip/databases/GeoLite2-City-CSV/download?suffix=zip" \
@@ -31,13 +32,39 @@ jobs:
           unzip -q tmp/maxmind/asn.zip -d tmp/maxmind/asn
       - name: Convert GeoLite2 CSV to SQL
         run: |
+          set -euo pipefail
           CITY_DIR="$(find tmp/maxmind/city -maxdepth 1 -type d -name 'GeoLite2-City-CSV_*' | head -1)"
           ASN_DIR="$(find tmp/maxmind/asn -maxdepth 1 -type d -name 'GeoLite2-ASN-CSV_*' | head -1)"
+          test -n "$CITY_DIR"
+          test -n "$ASN_DIR"
+          test -s "$CITY_DIR/GeoLite2-City-Blocks-IPv4.csv"
+          test -s "$CITY_DIR/GeoLite2-City-Blocks-IPv6.csv"
+          test -s "$CITY_DIR/GeoLite2-City-Locations-en.csv"
+          test -s "$ASN_DIR/GeoLite2-ASN-Blocks-IPv4.csv"
+          test -s "$ASN_DIR/GeoLite2-ASN-Blocks-IPv6.csv"
+
+          CITY_SHA="$(sha256sum tmp/maxmind/city.zip | awk '{print $1}')"
+          ASN_SHA="$(sha256sum tmp/maxmind/asn.zip | awk '{print $1}')"
+          CHECKSUM="city-sha256:$CITY_SHA asn-sha256:$ASN_SHA"
+          SOURCE="GeoLite2-City-CSV:${CITY_DIR##*/} GeoLite2-ASN-CSV:${ASN_DIR##*/}"
+          BUILD_DATE="${CITY_DIR##*_}"
+          BUILD_EPOCH="$(date -u -d "$BUILD_DATE" +%s)"
           node scripts/geoip/convert-geolite2.mjs \
             --city-blocks "$CITY_DIR/GeoLite2-City-Blocks-IPv4.csv" "$CITY_DIR/GeoLite2-City-Blocks-IPv6.csv" \
             --asn-blocks "$ASN_DIR/GeoLite2-ASN-Blocks-IPv4.csv" "$ASN_DIR/GeoLite2-ASN-Blocks-IPv6.csv" \
             --locations "$CITY_DIR/GeoLite2-City-Locations-en.csv" \
+            --source "$SOURCE" \
+            --build-epoch "$BUILD_EPOCH" \
+            --checksum "$CHECKSUM" \
             --output tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_networks" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_asn_networks" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_locations" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_imports" tmp/maxmind/geoip.sql
+          grep -q "BEGIN TRANSACTION;" tmp/maxmind/geoip.sql
+          grep -q "COMMIT;" tmp/maxmind/geoip.sql
+          INSERT_COUNT="$(grep -c "INSERT OR REPLACE INTO" tmp/maxmind/geoip.sql)"
+          test "$INSERT_COUNT" -gt 1000
       - name: Apply schema
         run: npx wrangler d1 execute netlens-geoip --remote --file=schema.sql
         env:

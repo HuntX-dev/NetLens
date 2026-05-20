@@ -9,14 +9,15 @@ const DECIMAL_WIDTH = 39;
 const args = parseArgs(process.argv.slice(2));
 if (!args.output || args.cityBlocks.length === 0 || args.asnBlocks.length === 0 || !args.locations) {
   console.error(
-    'Usage: node scripts/geoip/convert-geolite2.mjs --city-blocks <csv...> --asn-blocks <csv...> --locations <csv> --output <sql>'
+    'Usage: node scripts/geoip/convert-geolite2.mjs --city-blocks <csv...> --asn-blocks <csv...> --locations <csv> --output <sql> [--source <source>] [--build-epoch <epoch>] [--checksum <checksum>] [--imported-at <iso>]'
   );
   process.exit(1);
 }
 
 await mkdir(dirname(args.output), { recursive: true });
 const out = createWriteStream(args.output, { encoding: 'utf8' });
-const importedAt = new Date().toISOString();
+const importedAt = args.importedAt || new Date().toISOString();
+const importId = args.buildEpoch ? `${importedAt}-${args.buildEpoch}` : importedAt;
 let rowCount = 0;
 
 out.write('BEGIN TRANSACTION;\n');
@@ -86,20 +87,29 @@ for (const file of args.asnBlocks) {
 }
 
 writeInsert(out, 'geoip_imports', [
-  ['id', sqlString(importedAt)],
-  ['source', sqlString('maxmind')],
+  ['id', sqlString(importId)],
+  ['source', sqlString(args.source || 'maxmind')],
   ['edition', sqlString('GeoLite2-City-ASN')],
-  ['build_epoch', 'NULL'],
+  ['build_epoch', sqlNumber(args.buildEpoch)],
   ['imported_at', sqlString(importedAt)],
   ['row_count', rowCount],
-  ['checksum', 'NULL']
+  ['checksum', sqlString(args.checksum)]
 ]);
 out.write('COMMIT;\n');
 out.end();
 await finished(out);
 
 function parseArgs(argv) {
-  const parsed = { cityBlocks: [], asnBlocks: [], locations: '', output: '' };
+  const parsed = {
+    cityBlocks: [],
+    asnBlocks: [],
+    locations: '',
+    output: '',
+    source: '',
+    buildEpoch: '',
+    checksum: '',
+    importedAt: ''
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--city-blocks') {
@@ -114,6 +124,14 @@ function parseArgs(argv) {
       parsed.locations = argv[++index] ?? '';
     } else if (arg === '--output') {
       parsed.output = argv[++index] ?? '';
+    } else if (arg === '--source') {
+      parsed.source = argv[++index] ?? '';
+    } else if (arg === '--build-epoch') {
+      parsed.buildEpoch = argv[++index] ?? '';
+    } else if (arg === '--checksum') {
+      parsed.checksum = argv[++index] ?? '';
+    } else if (arg === '--imported-at') {
+      parsed.importedAt = argv[++index] ?? '';
     }
   }
   return parsed;
