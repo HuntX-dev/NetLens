@@ -62,7 +62,10 @@ describe('fetchRdap', () => {
     await fetchRdap('AS13335', fetcher);
 
     expect(fetcher).toHaveBeenCalledWith('https://rdap.org/autnum/13335', {
-      headers: { accept: 'application/rdap+json, application/json' }
+      headers: {
+        accept: 'application/rdap+json, application/json',
+        'user-agent': 'NetLens/0.1 (+https://github.com/nayacco/NetLens)'
+      }
     });
   });
 });
@@ -112,7 +115,10 @@ describe('/api/rdap', () => {
 
     expect(res.status).toBe(200);
     expect(fetcher).toHaveBeenCalledWith('https://rdap.org/autnum/13335', {
-      headers: { accept: 'application/rdap+json, application/json' }
+      headers: {
+        accept: 'application/rdap+json, application/json',
+        'user-agent': 'NetLens/0.1 (+https://github.com/nayacco/NetLens)'
+      }
     });
     await expect(res.json()).resolves.toMatchObject({
       ok: true,

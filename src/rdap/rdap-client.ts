@@ -39,7 +39,12 @@ export function rdapUrlFor(query: string): string {
 }
 
 export async function fetchRdap(query: string, fetcher: typeof fetch = fetch): Promise<unknown> {
-  const res = await fetcher(rdapUrlFor(query), { headers: { accept: 'application/rdap+json, application/json' } });
+  const res = await fetcher(rdapUrlFor(query), {
+    headers: {
+      accept: 'application/rdap+json, application/json',
+      'user-agent': 'NetLens/0.1 (+https://github.com/nayacco/NetLens)'
+    }
+  });
   if (!res.ok) throw new Error(`RDAP returned HTTP ${res.status}`);
   return res.json();
 }
