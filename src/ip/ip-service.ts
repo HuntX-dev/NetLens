@@ -14,7 +14,12 @@ export async function handleIpLookup(c: Context<{ Bindings: Env }>) {
   }
 
   const repo = new GeoIpRepository(c.env.DB);
-  const result = await repo.lookup(parsed.value);
+  let result;
+  try {
+    result = await repo.lookup(parsed.value);
+  } catch {
+    return c.json(failure('d1_unavailable', 'GeoIP database is unavailable.'), 503);
+  }
 
   if (!result) {
     return c.json(failure('not_found', 'No GeoLite2 match was found for this IP address.'), 404);
