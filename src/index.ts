@@ -25,13 +25,25 @@ app.get('/api/dns', async (c) => {
   if (!parsed.ok) return c.json(failure(parsed.code, parsed.message), 400);
 
   const result = await lookupDns(parsed.value);
+  if (result.summary.status === 'failed') {
+    return c.json(
+      failure('upstream_error', 'DNS lookup failed for all requested record types.', {
+        source: 'cloudflare-doh'
+      }),
+      502
+    );
+  }
+
   return c.json(
     success({
       query: { name: parsed.value },
       summary: result.summary,
       sections: Object.entries(result.recordsByType).map(([title, data]) => ({ title, data })),
       raw: result.rawByType,
-      meta: { source: 'cloudflare-doh', partial: result.summary.status === 'partial' }
+      meta: {
+        source: 'cloudflare-doh',
+        partial: result.summary.status === 'partial' || result.summary.status === 'problem'
+      }
     })
   );
 });
