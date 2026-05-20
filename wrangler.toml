@@ -2,6 +2,11 @@ name = "netlens"
 main = "src/index.ts"
 compatibility_date = "2026-05-20"
 
+[[rules]]
+type = "Text"
+globs = ["**/*.html?raw", "**/*.css?raw", "**/*.js?raw"]
+fallthrough = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "netlens-geoip"

@@ -1,4 +1,7 @@
 import { Hono } from 'hono';
+import html from './ui/app.html?raw';
+import css from './ui/styles.css?raw';
+import js from './ui/app.js?raw';
 import { lookupDns } from './dns/dns-service';
 import type { Env } from './env';
 import { failure, success } from './http/envelope';
@@ -8,6 +11,10 @@ import { classifyRdapQuery } from './rdap/rdap-client';
 import { lookupRdap } from './rdap/rdap-service';
 
 export const app = new Hono<{ Bindings: Env }>();
+
+app.get('/', (c) => c.html(html));
+app.get('/styles.css', (c) => c.text(css, 200, { 'content-type': 'text/css; charset=utf-8' }));
+app.get('/app.js', (c) => c.text(js, 200, { 'content-type': 'application/javascript; charset=utf-8' }));
 
 app.get('/api/health', (c) => {
   return c.json(

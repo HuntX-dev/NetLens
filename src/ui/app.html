@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NetLens</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">NetLens</div>
+        <nav class="tabs" aria-label="Tools">
+          <button data-tool="ip" class="tab is-active" type="button">IP</button>
+          <button data-tool="dns" class="tab" type="button">DNS</button>
+          <button data-tool="rdap" class="tab" type="button">RDAP</button>
+        </nav>
+        <div id="status" class="status">ready</div>
+      </header>
+
+      <section id="tool-ip" class="tool is-active">
+        <form data-form="ip" class="query">
+          <input name="ip" placeholder="Current IP, or enter IPv4 / IPv6" autocomplete="off">
+          <button type="submit">Query</button>
+        </form>
+      </section>
+
+      <section id="tool-dns" class="tool">
+        <form data-form="dns" class="query">
+          <input name="name" placeholder="example.com" autocomplete="off">
+          <button type="submit">Query</button>
+        </form>
+      </section>
+
+      <section id="tool-rdap" class="tool">
+        <form data-form="rdap" class="query">
+          <input name="query" placeholder="domain, IP, or ASN" autocomplete="off">
+          <button type="submit">Query</button>
+        </form>
+      </section>
+
+      <section class="results">
+        <div id="summary" class="summary"></div>
+        <div id="sections" class="sections"></div>
+        <pre id="raw" class="raw"></pre>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
