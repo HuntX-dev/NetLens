@@ -4,6 +4,7 @@ import type { Env } from './env';
 import { failure, success } from './http/envelope';
 import { parseDomain } from './http/input';
 import { handleIpLookup } from './ip/ip-service';
+import { lookupRdap } from './rdap/rdap-service';
 
 export const app = new Hono<{ Bindings: Env }>();
 
@@ -46,6 +47,31 @@ app.get('/api/dns', async (c) => {
       }
     })
   );
+});
+
+app.get('/api/rdap', async (c) => {
+  const query = (c.req.query('query') ?? '').trim();
+  if (!query) return c.json(failure('invalid_input', 'Enter a domain, IP address, or ASN.'), 400);
+
+  try {
+    const result = await lookupRdap(query);
+    return c.json(
+      success({
+        query: { query },
+        summary: result.summary,
+        sections: result.sections,
+        raw: result.raw,
+        meta: { source: 'rdap' }
+      })
+    );
+  } catch {
+    return c.json(
+      failure('upstream_error', 'RDAP lookup failed.', {
+        source: 'rdap'
+      }),
+      502
+    );
+  }
 });
 
 export default app;
