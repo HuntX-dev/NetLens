@@ -15,26 +15,26 @@
           <button data-tool="dns" class="tab" type="button">DNS</button>
           <button data-tool="rdap" class="tab" type="button">RDAP</button>
         </nav>
-        <div id="status" class="status">ready</div>
+        <div id="status" class="status" role="status" aria-live="polite">ready</div>
       </header>
 
       <section id="tool-ip" class="tool is-active">
         <form data-form="ip" class="query">
-          <input name="ip" placeholder="Current IP, or enter IPv4 / IPv6" autocomplete="off">
+          <input name="ip" aria-label="IP address" placeholder="Current IP, or enter IPv4 / IPv6" autocomplete="off">
           <button type="submit">Query</button>
         </form>
       </section>
 
       <section id="tool-dns" class="tool">
         <form data-form="dns" class="query">
-          <input name="name" placeholder="example.com" autocomplete="off">
+          <input name="name" aria-label="DNS name" placeholder="example.com" autocomplete="off">
           <button type="submit">Query</button>
         </form>
       </section>
 
       <section id="tool-rdap" class="tool">
         <form data-form="rdap" class="query">
-          <input name="query" placeholder="domain, IP, or ASN" autocomplete="off">
+          <input name="query" aria-label="RDAP query" placeholder="domain, IP, or ASN" autocomplete="off">
           <button type="submit">Query</button>
         </form>
       </section>

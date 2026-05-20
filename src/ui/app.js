@@ -1,27 +1,27 @@
-const tabs = document.querySelectorAll('[data-tool]');
-const tools = document.querySelectorAll('.tool');
-const statusEl = document.querySelector('#status');
-const summaryEl = document.querySelector('#summary');
-const sectionsEl = document.querySelector('#sections');
-const rawEl = document.querySelector('#raw');
+const tabs = requiredSelectorAll('[data-tool]');
+const tools = requiredSelectorAll('.tool');
+const statusEl = requiredSelector('#status');
+const summaryEl = requiredSelector('#summary');
+const sectionsEl = requiredSelector('#sections');
+const rawEl = requiredSelector('#raw');
 
 for (const tab of tabs) {
   tab.addEventListener('click', () => switchTool(tab.dataset.tool));
 }
 
-document.querySelector('[data-form="ip"]').addEventListener('submit', async (event) => {
+requiredSelector('[data-form="ip"]').addEventListener('submit', async (event) => {
   event.preventDefault();
   const ip = String(new FormData(event.currentTarget).get('ip') ?? '').trim();
   await requestJson(ip ? `/api/ip?ip=${encodeURIComponent(ip)}` : '/api/ip');
 });
 
-document.querySelector('[data-form="dns"]').addEventListener('submit', async (event) => {
+requiredSelector('[data-form="dns"]').addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
   await requestJson(`/api/dns?name=${encodeURIComponent(name)}`);
 });
 
-document.querySelector('[data-form="rdap"]').addEventListener('submit', async (event) => {
+requiredSelector('[data-form="rdap"]').addEventListener('submit', async (event) => {
   event.preventDefault();
   const query = String(new FormData(event.currentTarget).get('query') ?? '').trim();
   await requestJson(`/api/rdap?query=${encodeURIComponent(query)}`);
@@ -33,15 +33,20 @@ function switchTool(tool) {
 }
 
 async function requestJson(url) {
-  statusEl.textContent = 'loading';
-  statusEl.classList.remove('is-error');
+  setStatus('loading');
   const started = performance.now();
 
   try {
     const res = await fetch(url);
     const json = await res.json();
     render(json);
-    statusEl.textContent = `${Math.round(performance.now() - started)}ms`;
+
+    if (!res.ok || json.ok === false) {
+      setStatus(res.ok ? 'error' : `error · ${res.status}`, true);
+      return;
+    }
+
+    setStatus(`${Math.round(performance.now() - started)}ms`);
   } catch (error) {
     render({
       ok: false,
@@ -50,8 +55,7 @@ async function requestJson(url) {
         message: error instanceof Error ? error.message : 'Request failed'
       }
     });
-    statusEl.textContent = 'error';
-    statusEl.classList.add('is-error');
+    setStatus('error', true);
   }
 }
 
@@ -85,6 +89,23 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;'
   })[char]);
+}
+
+function setStatus(text, isError = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('is-error', isError);
+}
+
+function requiredSelector(selector) {
+  const element = document.querySelector(selector);
+  if (!element) throw new Error(`Missing required UI element: ${selector}`);
+  return element;
+}
+
+function requiredSelectorAll(selector) {
+  const elements = document.querySelectorAll(selector);
+  if (elements.length === 0) throw new Error(`Missing required UI elements: ${selector}`);
+  return elements;
 }
 
 requestJson('/api/ip');
