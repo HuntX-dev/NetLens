@@ -61,8 +61,6 @@ jobs:
           grep -q "INSERT OR REPLACE INTO geoip_asn_networks" tmp/maxmind/geoip.sql
           grep -q "INSERT OR REPLACE INTO geoip_locations" tmp/maxmind/geoip.sql
           grep -q "INSERT OR REPLACE INTO geoip_imports" tmp/maxmind/geoip.sql
-          grep -q "BEGIN TRANSACTION;" tmp/maxmind/geoip.sql
-          grep -q "COMMIT;" tmp/maxmind/geoip.sql
           INSERT_COUNT="$(grep -c "INSERT OR REPLACE INTO" tmp/maxmind/geoip.sql)"
           test "$INSERT_COUNT" -gt 1000
       - name: Apply schema

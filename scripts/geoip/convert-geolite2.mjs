@@ -20,7 +20,6 @@ const importedAt = args.importedAt || new Date().toISOString();
 const importId = args.buildEpoch ? `${importedAt}-${args.buildEpoch}` : importedAt;
 let rowCount = 0;
 
-out.write('BEGIN TRANSACTION;\n');
 out.write('DELETE FROM geoip_networks;\n');
 out.write('DELETE FROM geoip_asn_networks;\n');
 out.write('DELETE FROM geoip_locations;\n');
@@ -95,7 +94,6 @@ writeInsert(out, 'geoip_imports', [
   ['row_count', rowCount],
   ['checksum', sqlString(args.checksum)]
 ]);
-out.write('COMMIT;\n');
 out.end();
 await finished(out);
 

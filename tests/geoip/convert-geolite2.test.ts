@@ -74,6 +74,8 @@ describe('convert-geolite2', () => {
 
     const sql = readFileSync(output, 'utf8');
 
+    expect(sql).not.toContain('BEGIN TRANSACTION;');
+    expect(sql).not.toContain('COMMIT;');
     expect(sql).toContain("'000000000000000000000000000000016843008'");
     expect(sql).toContain("'000000000000000000000000000000016843263'");
     expect(sql).toContain("'000000000000000000000000000000000000001'");
