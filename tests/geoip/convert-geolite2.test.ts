@@ -50,7 +50,7 @@ describe('convert-geolite2', () => {
       ].join('\n')
     );
 
-    execFileSync('node', [
+    const stdout = String(execFileSync('node', [
       'scripts/geoip/convert-geolite2.mjs',
       '--city-blocks',
       cityBlocksIpv4,
@@ -70,12 +70,20 @@ describe('convert-geolite2', () => {
       '2026-05-20T16:00:00.000Z',
       '--output',
       output
-    ]);
+    ]));
 
     const sql = readFileSync(output, 'utf8');
 
     expect(sql).not.toContain('BEGIN TRANSACTION;');
     expect(sql).not.toContain('COMMIT;');
+    expect(sql).toContain('-- netlens-import total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
+    expect(stdout).toContain('Generated GeoIP import: total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
+    expect(sql).toContain("VALUES ('1.1.1.0/24'");
+    expect(sql).toContain("),('2606:4700:4700::/48'");
+    const encoder = new TextEncoder();
+    for (const statement of sql.split(';\n').filter((value) => value.startsWith('INSERT OR REPLACE'))) {
+      expect(encoder.encode(`${statement};\n`).length).toBeLessThanOrEqual(80_000);
+    }
     expect(sql).toContain("'000000000000000000000000000000016843008'");
     expect(sql).toContain("'000000000000000000000000000000016843263'");
     expect(sql).toContain("'000000000000000000000000000000000000001'");

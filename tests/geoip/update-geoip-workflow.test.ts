@@ -20,8 +20,12 @@ describe('update geoip workflow', () => {
     expect(workflow).toContain('grep -q "INSERT OR REPLACE INTO geoip_asn_networks" tmp/maxmind/geoip.sql');
     expect(workflow).toContain('grep -q "INSERT OR REPLACE INTO geoip_locations" tmp/maxmind/geoip.sql');
     expect(workflow).toContain('grep -q "INSERT OR REPLACE INTO geoip_imports" tmp/maxmind/geoip.sql');
+    expect(workflow).toContain('grep -q "^-- netlens-import total_rows=" tmp/maxmind/geoip.sql');
     expect(workflow).not.toContain('BEGIN TRANSACTION');
     expect(workflow).not.toContain('COMMIT;');
-    expect(workflow).toContain('test "$INSERT_COUNT" -gt 1000');
+    expect(workflow).toContain('test "$INSERT_COUNT" -gt 10');
+    expect(workflow).toContain('name: Report import size');
+    expect(workflow).toContain('echo "$SUMMARY"');
+    expect(workflow).toContain('echo "sql_file_bytes=$SQL_BYTES"');
   });
 });

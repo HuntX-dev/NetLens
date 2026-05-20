@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline';
 import { finished } from 'node:stream/promises';
 
 const DECIMAL_WIDTH = 39;
+const MAX_INSERT_STATEMENT_BYTES = 80_000;
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.output || args.cityBlocks.length === 0 || args.asnBlocks.length === 0 || !args.locations) {
@@ -19,6 +20,14 @@ const out = createWriteStream(args.output, { encoding: 'utf8' });
 const importedAt = args.importedAt || new Date().toISOString();
 const importId = args.buildEpoch ? `${importedAt}-${args.buildEpoch}` : importedAt;
 let rowCount = 0;
+const stats = {
+  locations: 0,
+  networks: 0,
+  asnNetworks: 0,
+  metadataRows: 0,
+  insertStatements: 0
+};
+let currentInsertBatch = null;
 
 out.write('DELETE FROM geoip_networks;\n');
 out.write('DELETE FROM geoip_asn_networks;\n');
@@ -26,6 +35,7 @@ out.write('DELETE FROM geoip_locations;\n');
 
 for await (const row of readCsv(args.locations)) {
   rowCount += 1;
+  stats.locations += 1;
   writeInsert(out, 'geoip_locations', [
     ['geoname_id', sqlNumber(row.geoname_id)],
     ['locale_code', sqlString(row.locale_code)],
@@ -47,6 +57,7 @@ for await (const row of readCsv(args.locations)) {
 for (const file of args.cityBlocks) {
   for await (const row of readCsv(file)) {
     rowCount += 1;
+    stats.networks += 1;
     const range = cidrToRange(row.network);
     writeInsert(out, 'geoip_networks', [
       ['id', sqlString(row.network)],
@@ -72,6 +83,7 @@ for (const file of args.cityBlocks) {
 for (const file of args.asnBlocks) {
   for await (const row of readCsv(file)) {
     rowCount += 1;
+    stats.asnNetworks += 1;
     const range = cidrToRange(row.network);
     writeInsert(out, 'geoip_asn_networks', [
       ['id', sqlString(row.network)],
@@ -85,6 +97,7 @@ for (const file of args.asnBlocks) {
   }
 }
 
+stats.metadataRows += 1;
 writeInsert(out, 'geoip_imports', [
   ['id', sqlString(importId)],
   ['source', sqlString(args.source || 'maxmind')],
@@ -94,8 +107,15 @@ writeInsert(out, 'geoip_imports', [
   ['row_count', rowCount],
   ['checksum', sqlString(args.checksum)]
 ]);
+flushInsertBatch(out);
+out.write(
+  `-- netlens-import total_rows=${rowCount} locations=${stats.locations} networks=${stats.networks} asn_networks=${stats.asnNetworks} metadata_rows=${stats.metadataRows} insert_statements=${stats.insertStatements} max_insert_statement_bytes=${MAX_INSERT_STATEMENT_BYTES}\n`
+);
 out.end();
 await finished(out);
+console.log(
+  `Generated GeoIP import: total_rows=${rowCount} locations=${stats.locations} networks=${stats.networks} asn_networks=${stats.asnNetworks} metadata_rows=${stats.metadataRows} insert_statements=${stats.insertStatements} max_insert_statement_bytes=${MAX_INSERT_STATEMENT_BYTES}`
+);
 
 function parseArgs(argv) {
   const parsed = {
@@ -237,11 +257,49 @@ function pad(value) {
 }
 
 function writeInsert(out, table, columns) {
-  out.write(
-    `INSERT OR REPLACE INTO ${table} (${columns.map(([column]) => column).join(',')}) VALUES (${columns
-      .map(([, value]) => value)
-      .join(',')});\n`
-  );
+  const columnNames = columns.map(([column]) => column);
+  const prefix = `INSERT OR REPLACE INTO ${table} (${columnNames.join(',')}) VALUES `;
+  const rowSql = `(${columns.map(([, value]) => value).join(',')})`;
+  const key = `${table}:${columnNames.join(',')}`;
+
+  if (currentInsertBatch && currentInsertBatch.key !== key) {
+    flushInsertBatch(out);
+  }
+
+  if (!currentInsertBatch) {
+    currentInsertBatch = {
+      key,
+      prefix,
+      rows: [],
+      byteLength: Buffer.byteLength(`${prefix};\n`, 'utf8')
+    };
+  }
+
+  const separatorBytes = currentInsertBatch.rows.length > 0 ? 1 : 0;
+  const rowBytes = Buffer.byteLength(rowSql, 'utf8');
+  if (
+    currentInsertBatch.rows.length > 0 &&
+    currentInsertBatch.byteLength + separatorBytes + rowBytes > MAX_INSERT_STATEMENT_BYTES
+  ) {
+    flushInsertBatch(out);
+    currentInsertBatch = {
+      key,
+      prefix,
+      rows: [],
+      byteLength: Buffer.byteLength(`${prefix};\n`, 'utf8')
+    };
+  }
+
+  currentInsertBatch.rows.push(rowSql);
+  currentInsertBatch.byteLength += separatorBytes + rowBytes;
+}
+
+function flushInsertBatch(out) {
+  if (!currentInsertBatch || currentInsertBatch.rows.length === 0) return;
+
+  out.write(`${currentInsertBatch.prefix}${currentInsertBatch.rows.join(',')};\n`);
+  stats.insertStatements += 1;
+  currentInsertBatch = null;
 }
 
 function sqlString(value) {

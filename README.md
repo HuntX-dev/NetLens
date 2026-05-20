@@ -129,7 +129,9 @@ npx wrangler d1 execute netlens-geoip --remote --file=tmp/maxmind/geoip.sql
 
 ## GeoLite2 Updates
 
-`.github/workflows/update-geoip.yml` runs daily at `03:17 UTC` and can also be started manually. The workflow downloads GeoLite2 City and ASN CSV archives, records archive checksums in import metadata, converts CSV rows into D1-compatible SQL, validates that expected inserts exist, applies `schema.sql`, and imports the generated SQL into remote D1.
+`.github/workflows/update-geoip.yml` runs daily at `03:17 UTC` and can also be started manually. The workflow downloads GeoLite2 City and ASN CSV archives, records archive checksums in import metadata, converts CSV rows into D1-compatible SQL, validates that expected inserts exist, prints the planned import size, applies `schema.sql`, and imports the generated SQL into remote D1.
+
+The converter batches multiple rows into each `INSERT OR REPLACE` statement up to an 80 KB safety ceiling. This reduces remote D1 import overhead while staying below Cloudflare D1's per-statement SQL size limit.
 
 Required GitHub Secrets:
 

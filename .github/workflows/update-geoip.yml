@@ -61,12 +61,20 @@ jobs:
           grep -q "INSERT OR REPLACE INTO geoip_asn_networks" tmp/maxmind/geoip.sql
           grep -q "INSERT OR REPLACE INTO geoip_locations" tmp/maxmind/geoip.sql
           grep -q "INSERT OR REPLACE INTO geoip_imports" tmp/maxmind/geoip.sql
+          grep -q "^-- netlens-import total_rows=" tmp/maxmind/geoip.sql
           INSERT_COUNT="$(grep -c "INSERT OR REPLACE INTO" tmp/maxmind/geoip.sql)"
-          test "$INSERT_COUNT" -gt 1000
+          test "$INSERT_COUNT" -gt 10
       - name: Apply schema
         run: npx wrangler d1 execute netlens-geoip --remote --file=schema.sql
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Report import size
+        run: |
+          set -euo pipefail
+          SUMMARY="$(grep "^-- netlens-import " tmp/maxmind/geoip.sql | tail -1)"
+          SQL_BYTES="$(wc -c < tmp/maxmind/geoip.sql | tr -d ' ')"
+          echo "$SUMMARY"
+          echo "sql_file_bytes=$SQL_BYTES"
       - name: Import generated SQL.
         run: npx wrangler d1 execute netlens-geoip --remote --file=tmp/maxmind/geoip.sql
         env:
