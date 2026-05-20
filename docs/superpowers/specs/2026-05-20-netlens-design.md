@@ -188,8 +188,8 @@ RDAP is the preferred protocol because it returns structured JSON over HTTPS. WH
 
 Lookup strategy:
 
-- For domain names, query an RDAP bootstrap source or known RDAP endpoint.
-- For IP addresses and ASNs, use RIR RDAP endpoints.
+- For domain names, IP addresses, and ASNs, query `rdap.org` and let it route to the correct registry service.
+- ASN lookups use `https://rdap.org/autnum/<asn>` after accepting either bare numeric ASN input or `AS`-prefixed input.
 - Normalize RDAP entities, events, notices, links, nameservers, status values, and registration dates.
 
 Primary display:
@@ -285,7 +285,7 @@ Indexes:
 - `geoname_id` on locations.
 - `(edition, imported_at)` on import metadata.
 
-IPv4 can be stored as an integer. IPv6 should be stored as sortable fixed-width text or split high/low integer-compatible parts, because JavaScript number precision is not safe for 128-bit integers.
+IPv4 and IPv6 range bounds are stored as sortable fixed-width 39-character decimal text, because JavaScript number precision is not safe for 128-bit integers.
 
 ### GitHub Actions Data Update
 
