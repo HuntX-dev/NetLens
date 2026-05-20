@@ -4,6 +4,7 @@ import type { Env } from './env';
 import { failure, success } from './http/envelope';
 import { parseDomain } from './http/input';
 import { handleIpLookup } from './ip/ip-service';
+import { classifyRdapQuery } from './rdap/rdap-client';
 import { lookupRdap } from './rdap/rdap-service';
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -52,12 +53,14 @@ app.get('/api/dns', async (c) => {
 app.get('/api/rdap', async (c) => {
   const query = (c.req.query('query') ?? '').trim();
   if (!query) return c.json(failure('invalid_input', 'Enter a domain, IP address, or ASN.'), 400);
+  const parsed = classifyRdapQuery(query);
+  if (!parsed.ok) return c.json(failure('invalid_input', parsed.message), 400);
 
   try {
-    const result = await lookupRdap(query);
+    const result = await lookupRdap(parsed.value);
     return c.json(
       success({
-        query: { query },
+        query: { query: parsed.value },
         summary: result.summary,
         sections: result.sections,
         raw: result.raw,
