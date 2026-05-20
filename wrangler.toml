@@ -1,0 +1,8 @@
+name = "netlens"
+main = "src/index.ts"
+compatibility_date = "2026-05-20"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "netlens-geoip"
+database_id = "replace-with-cloudflare-d1-database-id"
