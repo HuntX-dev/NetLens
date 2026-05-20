@@ -5,12 +5,11 @@ Status: Draft approved for planning
 
 ## Goal
 
-NetLens is a lightweight network inspection toolbox deployed on Cloudflare Workers. It uses Hono for routing, Cloudflare D1 for IP intelligence data, and plain HTML/CSS/JavaScript for the UI. The site exposes four independent tools that can be switched from one page:
+NetLens is a lightweight network inspection toolbox deployed on Cloudflare Workers. It uses Hono for routing, Cloudflare D1 for IP intelligence data, and plain HTML/CSS/JavaScript for the UI. The site exposes three independent tools that can be switched from one page:
 
-1. Visitor IP inspection.
+1. IP intelligence lookup backed by MaxMind GeoLite2 data imported into D1.
 2. Domain DNS record lookup through Cloudflare DNS over HTTPS.
 3. WHOIS / RDAP lookup.
-4. IP intelligence lookup backed by MaxMind GeoLite2 data imported into D1.
 
 The product should feel minimal, technical, and fast. The chosen visual direction is a **Hybrid Terminal Dashboard**: terminal-like typography, dark technical surfaces, and raw JSON/record panels, balanced with shadcn-like spacing and hierarchy so primary facts remain easy to scan.
 
@@ -37,10 +36,10 @@ Primary routes:
 | Route | Purpose |
 | --- | --- |
 | `GET /` | Serve the app shell. |
-| `GET /api/visitor` | Return the current visitor IP and Cloudflare request metadata. |
+| `GET /api/ip` | Return GeoLite2-backed IP intelligence for the current visitor IP. |
+| `GET /api/ip?ip=1.1.1.1` | Return GeoLite2-backed IP intelligence for an explicit IP input. |
 | `GET /api/dns?name=example.com` | Return aggregated DNS results for a domain. |
 | `GET /api/rdap?query=example.com` | Return RDAP / WHOIS-oriented registration data. |
-| `GET /api/ip?ip=1.1.1.1` | Return GeoLite2-backed IP intelligence from D1. |
 | `GET /api/health` | Return app, data version, and D1 availability status. |
 
 ## UI Design
@@ -48,8 +47,8 @@ Primary routes:
 The UI is one page with a compact top command bar:
 
 - Brand: `NetLens`.
-- Tool switcher: `Visitor`, `DNS`, `RDAP`, `IP`.
-- Small status area: current Worker colo / data version / latency.
+- Tool switcher: `IP`, `DNS`, `RDAP`.
+- Small status area: Worker colo, GeoLite2 data version, and request latency.
 
 Each tool follows the same information hierarchy:
 
@@ -67,35 +66,37 @@ The style should use:
 - Subtle borders rather than heavy cards.
 - No marketing hero, decorative gradients, or illustrative landing page.
 
-## Feature 1: Visitor IP Inspection
+## Feature 1: IP Intelligence
 
-This tool shows information available from the incoming Worker request.
+This is the default tool shown when a user first opens NetLens. On initial page load, it queries the current visitor IP. If the user enters an IP address, NetLens queries that explicit IP instead. In both cases, geolocation and network ownership must come from MaxMind GeoLite2 data in D1, not from Cloudflare's `request.cf` geolocation fields.
+
+Cloudflare request metadata is still useful, but only as request diagnostics for the current visit. It should not be mixed into the IP intelligence result for an explicitly entered IP.
 
 Primary fields:
 
-- Visitor IP from `CF-Connecting-IP`.
-- Country, continent, city, postal code, timezone, latitude, longitude from `request.cf` when present.
-- ASN and organization.
-- Cloudflare colo.
-- HTTP protocol, TLS version, TLS cipher, and negotiated request signals when present.
+- Queried IP address. Defaults to the visitor IP from `CF-Connecting-IP` when the `ip` query parameter is absent.
+- Country, continent, subdivision, city, postal code, timezone, latitude, longitude, and accuracy radius from GeoLite2 City / Country.
+- ASN, organization, and matched network from GeoLite2 ASN.
+- Data version / import date.
 
 Detailed fields:
 
-- Request URL and method.
-- Request transport fields: `httpProtocol`, `clientAcceptEncoding`, `requestPriority`, `edgeRequestKeepAliveStatus`, `clientTcpRtt`, `clientQuicRtt`, `edgeL4.deliveryRate`.
-- TLS fingerprint and handshake fields: `tlsVersion`, `tlsCipher`, `tlsClientRandom`, `tlsClientCiphersSha1`, `tlsClientExtensionsSha1`, `tlsClientExtensionsSha1Le`, `tlsClientHelloLength`, and `tlsExportedAuthenticator`.
-- mTLS client certificate status from `tlsClientAuth`.
-- Bot and trust signals: `botManagement.score`, `clientTrustScore`, `verifiedBot`, `verifiedBotCategory`, `corporateProxy`, `staticResource`, `ja3Hash`, `ja4`, `ja4Signals`, `jsDetection`, and `detectionIds`.
-- Selected request headers, with sensitive headers omitted or masked.
-- `request.cf` raw object.
-- Inferred client hints such as language, user agent, device hints, and accept encodings.
+- Registered country and represented country.
+- Metro code when present.
+- Traits available in GeoLite2 data.
+- Matching network ranges from each MaxMind dataset.
+- Raw D1 rows used to produce the result.
 
-Known Worker-accessible fields from the provided sample:
+Current-visitor diagnostics:
+
+When the tool is showing the current visitor IP, it may include an additional `requestDiagnostics` section sourced from Cloudflare Workers request data. This section explains how the current request reached the Worker; it is not the authoritative source for IP location.
+
+Known Worker-accessible diagnostic fields from the provided sample:
 
 | Group | Fields |
 | --- | --- |
 | Identity | `ip`, `headers.cf-connecting-ip`, `headers.x-real-ip` |
-| Location | `country`, `isEUCountry`, `city`, `continent`, `timezone`, `longitude`, `latitude`, `postalCode`, `headers.cf-ipcountry` |
+| Cloudflare location hints | `country`, `isEUCountry`, `city`, `continent`, `timezone`, `longitude`, `latitude`, `postalCode`, `headers.cf-ipcountry` |
 | Network | `colo`, `asn`, `asOrganization`, `clientTcpRtt`, `clientQuicRtt`, `edgeL4.deliveryRate` |
 | HTTP | `httpProtocol`, `clientAcceptEncoding`, `requestPriority`, `edgeRequestKeepAliveStatus`, `requestHeaderNames`, `headers` |
 | TLS | `tlsVersion`, `tlsCipher`, `tlsClientRandom`, `tlsClientCiphersSha1`, `tlsClientExtensionsSha1`, `tlsClientExtensionsSha1Le`, `tlsClientHelloLength`, `tlsExportedAuthenticator` |
@@ -108,37 +109,36 @@ Output shape:
 ```json
 {
   "ok": true,
+  "query": {
+    "ip": "47.129.35.106",
+    "source": "current_visitor"
+  },
   "primary": {
     "ip": "47.129.35.106",
     "country": "SG",
     "city": "Singapore",
     "asn": 16509,
-    "organization": "Amazon Data Services Singapore",
-    "colo": "SIN",
-    "httpProtocol": "HTTP/2",
-    "tls": "TLSv1.3 / AEAD-AES128-GCM-SHA256",
-    "botScore": 51
+    "organization": "Amazon Data Services Singapore"
   },
   "sections": {
     "location": {},
     "network": {},
-    "http": {},
-    "tls": {},
-    "clientCertificate": {},
-    "botManagement": {},
-    "headers": {}
+    "matchedRanges": {},
+    "requestDiagnostics": {}
   },
   "raw": {
-    "headers": {},
-    "cf": {}
+    "d1": {},
+    "request": {}
   }
 }
 ```
 
 Notes:
 
-- Missing Cloudflare fields must render as unavailable rather than errors.
-- The UI should treat TLS hashes, exported authenticators, certificate fields, and bot-management signals as advanced details: searchable and copyable, but below the primary summary.
+- Missing GeoLite2 rows must render as unavailable rather than errors.
+- For explicit IP input, `requestDiagnostics` should be omitted or clearly labeled as current-session diagnostics, never as data about the queried IP.
+- Cloudflare location hints may be displayed only under diagnostics for the current visitor. They must not override MaxMind values in the primary summary.
+- The UI should treat TLS hashes, exported authenticators, certificate fields, and bot-management signals as advanced current-request details: searchable and copyable, but below the primary summary.
 - Header rendering must mask or omit sensitive values such as cookies, authorization, and any future secret-bearing headers. The provided sample headers are safe to display, but the implementation should not assume all deployments are safe.
 - `requestHeaderNames` may be an empty object; render it as empty rather than hiding the HTTP section.
 
@@ -213,32 +213,13 @@ Future WHOIS option:
 
 - If true WHOIS text output is required, add an explicit external WHOIS-over-HTTPS provider or a separate backend later. This is intentionally outside the first implementation so the Cloudflare Worker remains self-contained.
 
-## Feature 4: IP Intelligence With MaxMind + D1
+## GeoIP Data With MaxMind + D1
 
-The IP lookup feature should use the broadest GeoLite2 coverage available:
+The IP intelligence feature should use the broadest GeoLite2 coverage available:
 
 - GeoLite2 City
 - GeoLite2 Country
 - GeoLite2 ASN
-
-Primary display:
-
-- IP address.
-- Country, subdivision, city.
-- Latitude / longitude and accuracy radius.
-- Timezone.
-- ASN, organization, and network.
-- Data version / import date.
-
-Detailed display:
-
-- Registered country and represented country.
-- Continent.
-- Postal code.
-- Metro code when present.
-- Traits available in GeoLite2 data.
-- Matching network ranges from each dataset.
-- Raw D1 rows used to produce the result.
 
 ### D1 Data Model
 
@@ -372,7 +353,7 @@ Common error codes:
 - DNS lookup should cap the number of record type queries per request.
 - RDAP responses should have timeout and size limits.
 - Raw output should be escaped and rendered as text, never injected as HTML.
-- Worker responses should be cache-aware only where safe; visitor IP output should not be shared-cacheable.
+- Worker responses should be cache-aware only where safe. The default current-visitor IP response should not be shared-cacheable because it depends on the incoming request identity. Explicit IP lookups may be cacheable when they do not include request diagnostics.
 
 ## Testing Strategy
 
@@ -388,8 +369,8 @@ Integration tests:
 
 - Hono routes return the common envelope.
 - DNS route handles `NOERROR`, `NXDOMAIN`, and partial timeout cases.
-- IP route returns merged City / Country / ASN data.
-- Visitor route tolerates missing `request.cf` fields.
+- IP route returns merged City / Country / ASN data for both default current-visitor lookup and explicit IP input.
+- IP route tolerates missing Cloudflare diagnostic fields because the authoritative IP intelligence comes from D1.
 
 UI tests:
 
@@ -414,7 +395,6 @@ Operational checks:
 
 ## Open Inputs Needed Later
 
-- Sample JSON showing all Worker request fields available in the target deployment.
 - MaxMind account/license setup details.
 - Cloudflare account, D1 database name, and Worker name.
 - Whether RDAP-only is acceptable for the first release or whether true WHOIS text must be added through an external provider.
