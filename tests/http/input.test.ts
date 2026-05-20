@@ -21,6 +21,22 @@ describe('parseIpInput', () => {
       message: 'Enter a valid IPv4 or IPv6 address.'
     });
   });
+
+  it('rejects IPv4 input with leading-zero octets', () => {
+    expect(parseIpInput('001.002.003.004')).toEqual({
+      ok: false,
+      code: 'invalid_input',
+      message: 'Enter a valid IPv4 or IPv6 address.'
+    });
+  });
+
+  it('rejects IPv4 input with a leading-zero octet', () => {
+    expect(parseIpInput('01.2.3.4')).toEqual({
+      ok: false,
+      code: 'invalid_input',
+      message: 'Enter a valid IPv4 or IPv6 address.'
+    });
+  });
 });
 
 describe('parseDomain', () => {
@@ -30,6 +46,14 @@ describe('parseDomain', () => {
 
   it('rejects invalid domain text', () => {
     expect(parseDomain('http://example.com')).toEqual({
+      ok: false,
+      code: 'invalid_input',
+      message: 'Enter a valid domain name without protocol or path.'
+    });
+  });
+
+  it('rejects IPv4 literals', () => {
+    expect(parseDomain('1.1.1.1')).toEqual({
       ok: false,
       code: 'invalid_input',
       message: 'Enter a valid domain name without protocol or path.'

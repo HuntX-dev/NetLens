@@ -4,7 +4,9 @@ type ParseError = { ok: false; code: ApiErrorCode; message: string };
 type IpParseSuccess = { ok: true; value: string; version: 4 | 6 };
 type DomainParseSuccess = { ok: true; value: string };
 
-const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+const IPV4_OCTET_RE = '(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
+const IPV4_RE = new RegExp(`^${IPV4_OCTET_RE}(\\.${IPV4_OCTET_RE}){3}$`);
+const IPV4_LITERAL_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 const DOMAIN_RE =
   /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/;
 
@@ -24,7 +26,12 @@ export function parseIpInput(input: string): IpParseSuccess | ParseError {
 
 export function parseDomain(input: string): DomainParseSuccess | ParseError {
   const value = input.trim().replace(/\.$/, '').toLowerCase();
-  if (value.includes('://') || value.includes('/') || value.includes('@')) {
+  if (
+    value.includes('://') ||
+    value.includes('/') ||
+    value.includes('@') ||
+    IPV4_LITERAL_RE.test(value)
+  ) {
     return invalidDomain();
   }
   if (!DOMAIN_RE.test(value)) return invalidDomain();
