@@ -10,4 +10,4 @@ fallthrough = true
 [[d1_databases]]
 binding = "DB"
 database_name = "netlens-geoip"
-database_id = "replace-with-cloudflare-d1-database-id"
+database_id = "3e4da3f5-a559-4475-b742-f12f57fa04a6"
