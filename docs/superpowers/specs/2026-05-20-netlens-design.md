@@ -74,17 +74,34 @@ This tool shows information available from the incoming Worker request.
 Primary fields:
 
 - Visitor IP from `CF-Connecting-IP`.
-- Country, region, city, postal code, timezone, latitude, longitude from `request.cf` when present.
+- Country, continent, city, postal code, timezone, latitude, longitude from `request.cf` when present.
 - ASN and organization.
 - Cloudflare colo.
-- Protocol and TLS information when present.
+- HTTP protocol, TLS version, TLS cipher, and negotiated request signals when present.
 
 Detailed fields:
 
 - Request URL and method.
-- Selected request headers, with sensitive headers omitted.
+- Request transport fields: `httpProtocol`, `clientAcceptEncoding`, `requestPriority`, `edgeRequestKeepAliveStatus`, `clientTcpRtt`, `clientQuicRtt`, `edgeL4.deliveryRate`.
+- TLS fingerprint and handshake fields: `tlsVersion`, `tlsCipher`, `tlsClientRandom`, `tlsClientCiphersSha1`, `tlsClientExtensionsSha1`, `tlsClientExtensionsSha1Le`, `tlsClientHelloLength`, and `tlsExportedAuthenticator`.
+- mTLS client certificate status from `tlsClientAuth`.
+- Bot and trust signals: `botManagement.score`, `clientTrustScore`, `verifiedBot`, `verifiedBotCategory`, `corporateProxy`, `staticResource`, `ja3Hash`, `ja4`, `ja4Signals`, `jsDetection`, and `detectionIds`.
+- Selected request headers, with sensitive headers omitted or masked.
 - `request.cf` raw object.
 - Inferred client hints such as language, user agent, device hints, and accept encodings.
+
+Known Worker-accessible fields from the provided sample:
+
+| Group | Fields |
+| --- | --- |
+| Identity | `ip`, `headers.cf-connecting-ip`, `headers.x-real-ip` |
+| Location | `country`, `isEUCountry`, `city`, `continent`, `timezone`, `longitude`, `latitude`, `postalCode`, `headers.cf-ipcountry` |
+| Network | `colo`, `asn`, `asOrganization`, `clientTcpRtt`, `clientQuicRtt`, `edgeL4.deliveryRate` |
+| HTTP | `httpProtocol`, `clientAcceptEncoding`, `requestPriority`, `edgeRequestKeepAliveStatus`, `requestHeaderNames`, `headers` |
+| TLS | `tlsVersion`, `tlsCipher`, `tlsClientRandom`, `tlsClientCiphersSha1`, `tlsClientExtensionsSha1`, `tlsClientExtensionsSha1Le`, `tlsClientHelloLength`, `tlsExportedAuthenticator` |
+| Client certificate | `tlsClientAuth.certPresented`, `certVerified`, `certRevoked`, issuer / subject names, serials, fingerprints, validity dates, RFC9440 fields |
+| Bot management | `botManagement.score`, `corporateProxy`, `verifiedBot`, `staticResource`, `ja3Hash`, `ja4`, `ja4Signals`, `jsDetection.passed`, `detectionIds`, `clientTrustScore`, `verifiedBotCategory` |
+| Browser hints | `headers.user-agent`, `accept-language`, `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`, `sec-fetch-*`, `upgrade-insecure-requests` |
 
 Output shape:
 
@@ -92,13 +109,25 @@ Output shape:
 {
   "ok": true,
   "primary": {
-    "ip": "203.0.113.42",
-    "country": "US",
-    "city": "San Francisco",
-    "asn": 13335,
-    "organization": "Cloudflare, Inc."
+    "ip": "47.129.35.106",
+    "country": "SG",
+    "city": "Singapore",
+    "asn": 16509,
+    "organization": "Amazon Data Services Singapore",
+    "colo": "SIN",
+    "httpProtocol": "HTTP/2",
+    "tls": "TLSv1.3 / AEAD-AES128-GCM-SHA256",
+    "botScore": 51
   },
-  "sections": {},
+  "sections": {
+    "location": {},
+    "network": {},
+    "http": {},
+    "tls": {},
+    "clientCertificate": {},
+    "botManagement": {},
+    "headers": {}
+  },
   "raw": {
     "headers": {},
     "cf": {}
@@ -108,8 +137,10 @@ Output shape:
 
 Notes:
 
-- The user will provide a sample JSON of Worker-accessible data later. The implementation should map that sample into the final display model.
 - Missing Cloudflare fields must render as unavailable rather than errors.
+- The UI should treat TLS hashes, exported authenticators, certificate fields, and bot-management signals as advanced details: searchable and copyable, but below the primary summary.
+- Header rendering must mask or omit sensitive values such as cookies, authorization, and any future secret-bearing headers. The provided sample headers are safe to display, but the implementation should not assume all deployments are safe.
+- `requestHeaderNames` may be an empty object; render it as empty rather than hiding the HTTP section.
 
 ## Feature 2: DNS Lookup
 
