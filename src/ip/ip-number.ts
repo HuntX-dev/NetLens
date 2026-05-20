@@ -3,7 +3,7 @@ export type IpRangeKey = {
   key: string;
 };
 
-const DECIMAL_WIDTH = 38;
+const DECIMAL_WIDTH = 39;
 
 export function ipToRangeKey(ip: string): IpRangeKey {
   if (ip.includes('.')) {
