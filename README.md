@@ -4,6 +4,8 @@
 
 🔎 NetLens is a lightweight network inspection toolbox built for Cloudflare Workers. It gives you IP intelligence, DNS lookup, and RDAP lookup from one plain HTML/CSS/JavaScript interface.
 
+🌐 Live site: [net.huntx.dev](https://net.huntx.dev)
+
 ## ✨ Features
 
 - 🌍 **IP Intelligence**: looks up IPv4 and IPv6 addresses with MaxMind GeoLite2 data stored in Cloudflare D1.

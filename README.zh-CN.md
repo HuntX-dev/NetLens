@@ -4,6 +4,8 @@
 
 🔎 NetLens 是一个运行在 Cloudflare Workers 上的轻量网络信息查询工具。它用一个原生 HTML/CSS/JavaScript 界面提供 IP 情报、DNS 查询和 RDAP 查询。
 
+🌐 在线访问：[net.huntx.dev](https://net.huntx.dev)
+
 ## ✨ 功能特性
 
 - 🌍 **IP 情报**：基于存储在 Cloudflare D1 中的 MaxMind GeoLite2 数据查询 IPv4 / IPv6。
