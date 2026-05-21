@@ -60,5 +60,11 @@ CREATE INDEX IF NOT EXISTS idx_geoip_networks_range
 CREATE INDEX IF NOT EXISTS idx_geoip_asn_networks_range
   ON geoip_asn_networks (ip_version, start_ip_num, end_ip_num);
 
+CREATE INDEX IF NOT EXISTS idx_geoip_networks_start_desc
+  ON geoip_networks (ip_version, start_ip_num DESC);
+
+CREATE INDEX IF NOT EXISTS idx_geoip_asn_networks_start_desc
+  ON geoip_asn_networks (ip_version, start_ip_num DESC);
+
 CREATE INDEX IF NOT EXISTS idx_geoip_imports_edition
   ON geoip_imports (edition, imported_at);

@@ -11,6 +11,8 @@ describe('D1 schema', () => {
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS geoip_locations');
     expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_geoip_networks_range');
     expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_geoip_asn_networks_range');
+    expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_geoip_networks_start_desc');
+    expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_geoip_asn_networks_start_desc');
     expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_geoip_imports_edition');
   });
 });

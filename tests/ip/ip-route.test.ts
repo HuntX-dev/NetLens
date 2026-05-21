@@ -34,6 +34,7 @@ describe('/api/ip', () => {
       {},
       envWithDb({
         network: '1.1.1.0/24',
+        end_ip_num: '000000000000000000000000000000016843263',
         country_iso_code: 'AU',
         country_name: 'Australia',
         city_name: 'Research',
@@ -64,6 +65,7 @@ describe('/api/ip', () => {
       },
       envWithDb({
         network: '1.1.1.0/24',
+        end_ip_num: '000000000000000000000000000000016843263',
         country_iso_code: 'AU',
         country_name: 'Australia',
         city_name: 'Research',
@@ -89,6 +91,7 @@ describe('/api/ip', () => {
       {},
       envWithDb({
         network: '47.129.0.0/16',
+        end_ip_num: '000000000000000000000000000007974518783',
         country_iso_code: 'SG',
         country_name: 'Singapore',
         city_name: 'Singapore',

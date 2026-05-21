@@ -32,4 +32,47 @@ describe('UI shell', () => {
     expect(js).toContain("setStatus('error");
     expect(js).toContain('!res.ok || json.ok === false');
   });
+
+  it('renders results as structured sections with collapsible raw data', () => {
+    const html = readFileSync('src/ui/app.html', 'utf8');
+    const js = readFileSync('src/ui/app.js', 'utf8');
+
+    expect(html).toContain('<details class="raw-panel">');
+    expect(html).toContain('<summary>Raw data</summary>');
+    expect(js).toContain('function renderSection');
+    expect(js).toContain('function renderDnsRecords');
+    expect(js).toContain('function renderRdapItems');
+    expect(js).toContain('function renderObjectGrid');
+    expect(js).toContain("article.className = 'section-card'");
+    expect(js).not.toContain('`${section.title}\\n${JSON.stringify(section.data, null, 2)}`');
+  });
+
+  it('shows skeleton loading before the first result and a soft update state afterward', () => {
+    const js = readFileSync('src/ui/app.js', 'utf8');
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+
+    expect(js).toContain("const resultsEl = requiredSelector('.results')");
+    expect(js).toContain('function renderLoading');
+    expect(js).toContain("summaryEl.setAttribute('aria-busy', 'true')");
+    expect(js).toContain("sectionsEl.setAttribute('aria-busy', 'true')");
+    expect(js).toContain("resultsEl.classList.add('is-updating')");
+    expect(js).toContain("createSkeleton('skeleton skeleton-card')");
+    expect(css).toContain('.skeleton');
+    expect(css).toContain('@keyframes skeleton-pulse');
+    expect(css).toContain('.results.is-updating::before');
+  });
+
+  it('keeps results scoped to the selected tool tab', () => {
+    const js = readFileSync('src/ui/app.js', 'utf8');
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+
+    expect(js).toContain("let activeTool = 'ip'");
+    expect(js).toContain('const resultsByTool = new Map()');
+    expect(js).toContain('let currentRequestId = 0');
+    expect(js).toContain('function showToolResult');
+    expect(js).toContain('function renderEmptyTool');
+    expect(js).toContain('if (requestId !== currentRequestId || tool !== activeTool) return');
+    expect(js).toContain("resultsByTool.set(tool, json)");
+    expect(css).toContain('.empty-panel');
+  });
 });

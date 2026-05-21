@@ -19,11 +19,16 @@ export type GeoIpLookup = {
 
 type GeoIpRow = {
   network: string | null;
+  end_ip_num: string;
   country_iso_code: string | null;
   country_name: string | null;
   city_name: string | null;
   latitude: number | null;
   longitude: number | null;
+};
+
+type GeoIpAsnRow = {
+  end_ip_num: string;
   autonomous_system_number: number | null;
   autonomous_system_organization: string | null;
 };
@@ -33,49 +38,61 @@ export class GeoIpRepository {
 
   async lookup(ip: string): Promise<GeoIpLookup | null> {
     const key = ipToRangeKey(ip);
-    const row = await this.db
+    const location = await this.db
       .prepare(
         `SELECT
           n.network,
+          n.end_ip_num,
           l.country_iso_code,
           l.country_name,
           l.city_name,
           n.latitude,
-          n.longitude,
-          a.autonomous_system_number,
-          a.autonomous_system_organization
+          n.longitude
         FROM geoip_networks n
         LEFT JOIN geoip_locations l ON l.geoname_id = n.geoname_id
-        LEFT JOIN geoip_asn_networks a
-          ON a.ip_version = n.ip_version
-          AND a.start_ip_num <= ?
-          AND a.end_ip_num >= ?
         WHERE n.ip_version = ?
           AND n.start_ip_num <= ?
-          AND n.end_ip_num >= ?
         ORDER BY n.start_ip_num DESC
         LIMIT 1`
       )
-      .bind(key.key, key.key, key.version, key.key, key.key)
+      .bind(key.version, key.key)
       .first<GeoIpRow>();
 
-    if (!row) return null;
+    if (!location || location.end_ip_num < key.key) return null;
+
+    const asn = await this.db
+      .prepare(
+        `SELECT
+          end_ip_num,
+          autonomous_system_number,
+          autonomous_system_organization
+        FROM geoip_asn_networks
+        WHERE ip_version = ?
+          AND start_ip_num <= ?
+        ORDER BY start_ip_num DESC
+        LIMIT 1`
+      )
+      .bind(key.version, key.key)
+      .first<GeoIpAsnRow>();
+
+    const matchedAsn = asn && asn.end_ip_num >= key.key ? asn : null;
+    const raw = { ...location, ...(matchedAsn ?? {}) };
 
     return {
       ip,
       location: {
-        countryIsoCode: row.country_iso_code,
-        countryName: row.country_name,
-        cityName: row.city_name,
-        latitude: row.latitude,
-        longitude: row.longitude
+        countryIsoCode: location.country_iso_code,
+        countryName: location.country_name,
+        cityName: location.city_name,
+        latitude: location.latitude,
+        longitude: location.longitude
       },
       asn: {
-        number: row.autonomous_system_number,
-        organization: row.autonomous_system_organization
+        number: matchedAsn?.autonomous_system_number ?? null,
+        organization: matchedAsn?.autonomous_system_organization ?? null
       },
-      matchedNetwork: row.network,
-      raw: row
+      matchedNetwork: location.network,
+      raw
     };
   }
 }
