@@ -74,8 +74,23 @@ describe('convert-geolite2', () => {
 
     const sql = readFileSync(output, 'utf8');
 
-    expect(sql).not.toContain('BEGIN TRANSACTION;');
-    expect(sql).not.toContain('COMMIT;');
+    expect(sql).not.toContain('DELETE FROM geoip_networks;');
+    expect(sql).not.toContain('DELETE FROM geoip_asn_networks;');
+    expect(sql).not.toContain('DELETE FROM geoip_locations;');
+    expect(sql).toContain('CREATE TABLE geoip_networks_next');
+    expect(sql).toContain('CREATE TABLE geoip_asn_networks_next');
+    expect(sql).toContain('CREATE TABLE geoip_locations_next');
+    expect(sql).toContain('INSERT OR REPLACE INTO geoip_networks_next');
+    expect(sql).toContain('INSERT OR REPLACE INTO geoip_asn_networks_next');
+    expect(sql).toContain('INSERT OR REPLACE INTO geoip_locations_next');
+    expect(sql).toContain('CREATE INDEX idx_geoip_networks_next_start_desc');
+    expect(sql).toContain('CREATE INDEX idx_geoip_asn_networks_next_start_desc');
+    expect(sql).toContain('ALTER TABLE geoip_networks_next RENAME TO geoip_networks;');
+    expect(sql).toContain('ALTER TABLE geoip_asn_networks_next RENAME TO geoip_asn_networks;');
+    expect(sql).toContain('ALTER TABLE geoip_locations_next RENAME TO geoip_locations;');
+    expect(sql).toContain('DROP TABLE IF EXISTS geoip_networks_old;');
+    expect(sql).toContain('BEGIN TRANSACTION;');
+    expect(sql).toContain('COMMIT;');
     expect(sql).toContain('-- netlens-import total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
     expect(stdout).toContain('Generated GeoIP import: total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
     expect(sql).toContain("VALUES ('1.1.1.0/24'");

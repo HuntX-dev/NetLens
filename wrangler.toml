@@ -2,6 +2,10 @@ name = "netlens"
 main = "src/index.ts"
 compatibility_date = "2026-05-20"
 
+routes = [
+  { pattern = "net.huntx.dev", custom_domain = true }
+]
+
 [[rules]]
 type = "Text"
 globs = ["**/*.html?raw", "**/*.css?raw", "**/*.js?raw"]

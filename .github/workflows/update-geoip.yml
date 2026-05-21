@@ -57,10 +57,11 @@ jobs:
             --build-epoch "$BUILD_EPOCH" \
             --checksum "$CHECKSUM" \
             --output tmp/maxmind/geoip.sql
-          grep -q "INSERT OR REPLACE INTO geoip_networks" tmp/maxmind/geoip.sql
-          grep -q "INSERT OR REPLACE INTO geoip_asn_networks" tmp/maxmind/geoip.sql
-          grep -q "INSERT OR REPLACE INTO geoip_locations" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_networks_next" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_asn_networks_next" tmp/maxmind/geoip.sql
+          grep -q "INSERT OR REPLACE INTO geoip_locations_next" tmp/maxmind/geoip.sql
           grep -q "INSERT OR REPLACE INTO geoip_imports" tmp/maxmind/geoip.sql
+          grep -q "ALTER TABLE geoip_networks_next RENAME TO geoip_networks" tmp/maxmind/geoip.sql
           grep -q "^-- netlens-import total_rows=" tmp/maxmind/geoip.sql
           INSERT_COUNT="$(grep -c "INSERT OR REPLACE INTO" tmp/maxmind/geoip.sql)"
           test "$INSERT_COUNT" -gt 10

@@ -6,6 +6,12 @@ import { finished } from 'node:stream/promises';
 
 const DECIMAL_WIDTH = 39;
 const MAX_INSERT_STATEMENT_BYTES = 80_000;
+const TABLES = {
+  imports: 'geoip_imports',
+  locations: 'geoip_locations_next',
+  networks: 'geoip_networks_next',
+  asnNetworks: 'geoip_asn_networks_next'
+};
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.output || args.cityBlocks.length === 0 || args.asnBlocks.length === 0 || !args.locations) {
@@ -29,14 +35,12 @@ const stats = {
 };
 let currentInsertBatch = null;
 
-out.write('DELETE FROM geoip_networks;\n');
-out.write('DELETE FROM geoip_asn_networks;\n');
-out.write('DELETE FROM geoip_locations;\n');
+writeStagingPreamble(out);
 
 for await (const row of readCsv(args.locations)) {
   rowCount += 1;
   stats.locations += 1;
-  writeInsert(out, 'geoip_locations', [
+  writeInsert(out, TABLES.locations, [
     ['geoname_id', sqlNumber(row.geoname_id)],
     ['locale_code', sqlString(row.locale_code)],
     ['continent_code', sqlString(row.continent_code)],
@@ -59,7 +63,7 @@ for (const file of args.cityBlocks) {
     rowCount += 1;
     stats.networks += 1;
     const range = cidrToRange(row.network);
-    writeInsert(out, 'geoip_networks', [
+    writeInsert(out, TABLES.networks, [
       ['id', sqlString(row.network)],
       ['ip_version', range.version],
       ['network', sqlString(row.network)],
@@ -85,7 +89,7 @@ for (const file of args.asnBlocks) {
     rowCount += 1;
     stats.asnNetworks += 1;
     const range = cidrToRange(row.network);
-    writeInsert(out, 'geoip_asn_networks', [
+    writeInsert(out, TABLES.asnNetworks, [
       ['id', sqlString(row.network)],
       ['ip_version', range.version],
       ['network', sqlString(row.network)],
@@ -98,7 +102,9 @@ for (const file of args.asnBlocks) {
 }
 
 stats.metadataRows += 1;
-writeInsert(out, 'geoip_imports', [
+flushInsertBatch(out);
+writeStagingIndexes(out);
+writeInsert(out, TABLES.imports, [
   ['id', sqlString(importId)],
   ['source', sqlString(args.source || 'maxmind')],
   ['edition', sqlString('GeoLite2-City-ASN')],
@@ -108,6 +114,7 @@ writeInsert(out, 'geoip_imports', [
   ['checksum', sqlString(args.checksum)]
 ]);
 flushInsertBatch(out);
+writeSwap(out);
 out.write(
   `-- netlens-import total_rows=${rowCount} locations=${stats.locations} networks=${stats.networks} asn_networks=${stats.asnNetworks} metadata_rows=${stats.metadataRows} insert_statements=${stats.insertStatements} max_insert_statement_bytes=${MAX_INSERT_STATEMENT_BYTES}\n`
 );
@@ -116,6 +123,80 @@ await finished(out);
 console.log(
   `Generated GeoIP import: total_rows=${rowCount} locations=${stats.locations} networks=${stats.networks} asn_networks=${stats.asnNetworks} metadata_rows=${stats.metadataRows} insert_statements=${stats.insertStatements} max_insert_statement_bytes=${MAX_INSERT_STATEMENT_BYTES}`
 );
+
+function writeStagingPreamble(out) {
+  out.write(`DROP TABLE IF EXISTS ${TABLES.networks};\n`);
+  out.write(`DROP TABLE IF EXISTS ${TABLES.asnNetworks};\n`);
+  out.write(`DROP TABLE IF EXISTS ${TABLES.locations};\n`);
+  out.write(`CREATE TABLE ${TABLES.networks} (
+  id TEXT PRIMARY KEY,
+  ip_version INTEGER NOT NULL,
+  network TEXT NOT NULL,
+  start_ip_num TEXT NOT NULL,
+  end_ip_num TEXT NOT NULL,
+  geoname_id INTEGER,
+  registered_country_geoname_id INTEGER,
+  represented_country_geoname_id INTEGER,
+  is_anonymous_proxy INTEGER,
+  is_satellite_provider INTEGER,
+  postal_code TEXT,
+  latitude REAL,
+  longitude REAL,
+  accuracy_radius INTEGER,
+  metro_code INTEGER,
+  time_zone TEXT
+);\n`);
+  out.write(`CREATE TABLE ${TABLES.asnNetworks} (
+  id TEXT PRIMARY KEY,
+  ip_version INTEGER NOT NULL,
+  network TEXT NOT NULL,
+  start_ip_num TEXT NOT NULL,
+  end_ip_num TEXT NOT NULL,
+  autonomous_system_number INTEGER,
+  autonomous_system_organization TEXT
+);\n`);
+  out.write(`CREATE TABLE ${TABLES.locations} (
+  geoname_id INTEGER PRIMARY KEY,
+  locale_code TEXT,
+  continent_code TEXT,
+  continent_name TEXT,
+  country_iso_code TEXT,
+  country_name TEXT,
+  subdivision_1_iso_code TEXT,
+  subdivision_1_name TEXT,
+  subdivision_2_iso_code TEXT,
+  subdivision_2_name TEXT,
+  city_name TEXT,
+  metro_code INTEGER,
+  time_zone TEXT,
+  is_in_european_union INTEGER
+);\n`);
+}
+
+function writeStagingIndexes(out) {
+  out.write(`CREATE INDEX idx_geoip_networks_next_range
+  ON ${TABLES.networks} (ip_version, start_ip_num, end_ip_num);\n`);
+  out.write(`CREATE INDEX idx_geoip_networks_next_start_desc
+  ON ${TABLES.networks} (ip_version, start_ip_num DESC);\n`);
+  out.write(`CREATE INDEX idx_geoip_asn_networks_next_range
+  ON ${TABLES.asnNetworks} (ip_version, start_ip_num, end_ip_num);\n`);
+  out.write(`CREATE INDEX idx_geoip_asn_networks_next_start_desc
+  ON ${TABLES.asnNetworks} (ip_version, start_ip_num DESC);\n`);
+}
+
+function writeSwap(out) {
+  out.write('BEGIN TRANSACTION;\n');
+  out.write('ALTER TABLE geoip_networks RENAME TO geoip_networks_old;\n');
+  out.write('ALTER TABLE geoip_asn_networks RENAME TO geoip_asn_networks_old;\n');
+  out.write('ALTER TABLE geoip_locations RENAME TO geoip_locations_old;\n');
+  out.write(`ALTER TABLE ${TABLES.networks} RENAME TO geoip_networks;\n`);
+  out.write(`ALTER TABLE ${TABLES.asnNetworks} RENAME TO geoip_asn_networks;\n`);
+  out.write(`ALTER TABLE ${TABLES.locations} RENAME TO geoip_locations;\n`);
+  out.write('COMMIT;\n');
+  out.write('DROP TABLE IF EXISTS geoip_networks_old;\n');
+  out.write('DROP TABLE IF EXISTS geoip_asn_networks_old;\n');
+  out.write('DROP TABLE IF EXISTS geoip_locations_old;\n');
+}
 
 function parseArgs(argv) {
   const parsed = {
