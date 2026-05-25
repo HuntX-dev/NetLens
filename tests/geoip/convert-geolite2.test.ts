@@ -85,6 +85,12 @@ describe('convert-geolite2', () => {
     expect(sql).toContain('INSERT OR REPLACE INTO geoip_locations_next');
     expect(sql).toContain('CREATE INDEX idx_geoip_networks_next_start_desc');
     expect(sql).toContain('CREATE INDEX idx_geoip_asn_networks_next_start_desc');
+    expect(sql.indexOf('CREATE INDEX idx_geoip_networks_next_range')).toBeLessThan(
+      sql.indexOf('INSERT OR REPLACE INTO geoip_networks_next')
+    );
+    expect(sql.indexOf('CREATE INDEX idx_geoip_asn_networks_next_range')).toBeLessThan(
+      sql.indexOf('INSERT OR REPLACE INTO geoip_asn_networks_next')
+    );
     expect(sql).toContain('ALTER TABLE geoip_networks_next RENAME TO geoip_networks;');
     expect(sql).toContain('ALTER TABLE geoip_asn_networks_next RENAME TO geoip_asn_networks;');
     expect(sql).toContain('ALTER TABLE geoip_locations_next RENAME TO geoip_locations;');

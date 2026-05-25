@@ -88,9 +88,18 @@ jobs:
       - name: Import generated SQL chunks
         run: |
           set -euo pipefail
+          count=0
           for chunk in tmp/maxmind/d1-chunks/*.sql; do
-            echo "Importing $chunk"
-            npx wrangler d1 execute netlens-geoip --remote --file="$chunk"
+            if ! output="$(npx wrangler d1 execute netlens-geoip --remote --file="$chunk" 2>&1)"; then
+              echo "$output"
+              echo "Failed importing $chunk"
+              exit 1
+            fi
+            count=$((count + 1))
+            if [ $((count % 50)) -eq 0 ]; then
+              echo "Imported $count D1 chunks"
+            fi
           done
+          echo "Imported $count D1 chunks"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

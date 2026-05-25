@@ -36,6 +36,7 @@ const stats = {
 let currentInsertBatch = null;
 
 writeStagingPreamble(out);
+writeStagingIndexes(out);
 
 for await (const row of readCsv(args.locations)) {
   rowCount += 1;
@@ -103,7 +104,6 @@ for (const file of args.asnBlocks) {
 
 stats.metadataRows += 1;
 flushInsertBatch(out);
-writeStagingIndexes(out);
 writeInsert(out, TABLES.imports, [
   ['id', sqlString(importId)],
   ['source', sqlString(args.source || 'maxmind')],
