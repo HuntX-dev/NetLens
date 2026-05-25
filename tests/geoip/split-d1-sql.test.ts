@@ -5,6 +5,13 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 describe('split-d1-sql', () => {
+  it('streams input instead of reading the whole SQL file into a string', () => {
+    const script = readFileSync('scripts/geoip/split-d1-sql.mjs', 'utf8');
+
+    expect(script).toContain('createReadStream');
+    expect(script).not.toContain('readFileSync');
+  });
+
   it('splits generated SQL on statement boundaries and keeps transactions together', () => {
     const dir = mkdtempSync(join(tmpdir(), 'netlens-split-sql-'));
     const input = join(dir, 'geoip.sql');

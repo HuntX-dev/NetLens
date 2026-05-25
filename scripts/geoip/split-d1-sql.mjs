@@ -1,6 +1,7 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { finished } from 'node:stream/promises';
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.input || !args.outputDir) {
@@ -10,22 +11,18 @@ if (!args.input || !args.outputDir) {
   process.exit(1);
 }
 
-const statements = splitSqlStatements(readFileSync(args.input, 'utf8'));
-const chunks = buildChunks(statements, {
-  maxStatements: Number(args.maxStatements || 500),
-  maxBytes: Number(args.maxBytes || 5_000_000)
-});
+const limits = {
+  maxStatements: parsePositiveInteger(args.maxStatements || '500', '--max-statements'),
+  maxBytes: parsePositiveInteger(args.maxBytes || '5000000', '--max-bytes')
+};
 
 await rm(args.outputDir, { recursive: true, force: true });
 await mkdir(args.outputDir, { recursive: true });
 
-for (let index = 0; index < chunks.length; index += 1) {
-  const filename = `chunk-${String(index + 1).padStart(4, '0')}.sql`;
-  await writeFile(join(args.outputDir, filename), chunks[index], 'utf8');
-}
+const stats = await splitSqlFile(args.input, args.outputDir, limits);
 
 console.log(
-  `Split ${basename(args.input)} into ${chunks.length} D1 chunks: statements=${statements.length} max_statements=${args.maxStatements || 500} max_bytes=${args.maxBytes || 5_000_000}`
+  `Split ${basename(args.input)} into ${stats.chunks} D1 chunks: statements=${stats.statements} max_statements=${limits.maxStatements} max_bytes=${limits.maxBytes}`
 );
 
 function parseArgs(argv) {
@@ -50,93 +47,128 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function splitSqlStatements(sql) {
-  const statements = [];
+function parsePositiveInteger(value, name) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+async function splitSqlFile(input, outputDir, limits) {
+  const writer = createChunkWriter(outputDir, limits);
+  const reader = createReadStream(input, { encoding: 'utf8' });
   let current = '';
   let quoted = false;
+  let pendingQuote = false;
 
-  for (let index = 0; index < sql.length; index += 1) {
-    const char = sql[index];
-    current += char;
+  for await (const chunk of reader) {
+    for (let index = 0; index < chunk.length; index += 1) {
+      const char = chunk[index];
 
-    if (char === "'") {
-      if (quoted && sql[index + 1] === "'") {
-        current += sql[++index];
-      } else {
-        quoted = !quoted;
+      if (pendingQuote) {
+        if (char === "'") {
+          current += char;
+          pendingQuote = false;
+          continue;
+        }
+        quoted = false;
+        pendingQuote = false;
       }
-    } else if (char === ';' && !quoted) {
-      pushCurrent();
+
+      current += char;
+
+      if (char === "'" && quoted) {
+        pendingQuote = true;
+      } else if (char === "'") {
+        quoted = true;
+      } else if (char === ';' && !quoted) {
+        await writer.addStatement(current);
+        current = '';
+      }
     }
   }
 
-  pushCurrent();
-  return statements;
-
-  function pushCurrent() {
-    const statement = current.trim();
-    if (statement) statements.push(`${statement}\n`);
-    current = '';
-  }
+  if (pendingQuote) quoted = false;
+  await writer.addStatement(current);
+  return writer.close();
 }
 
-function buildChunks(statements, options) {
-  const groups = groupTransactions(statements);
-  const chunks = [];
-  let current = [];
-  let currentBytes = 0;
-  let currentStatements = 0;
+function createChunkWriter(outputDir, limits) {
+  let chunkIndex = 0;
+  let chunkStream = null;
+  let chunkBytes = 0;
+  let chunkStatements = 0;
+  let totalStatements = 0;
+  let pendingTransaction = null;
 
-  for (const group of groups) {
+  return {
+    async addStatement(rawStatement) {
+      const statement = rawStatement.trim();
+      if (!statement) return;
+
+      const statementSql = `${statement}\n`;
+      const normalized = statement.toUpperCase();
+
+      if (pendingTransaction) {
+        pendingTransaction.push(statementSql);
+        if (/^COMMIT\s*;?$/.test(normalized)) {
+          const transaction = pendingTransaction;
+          pendingTransaction = null;
+          await writeGroup(transaction);
+        }
+        return;
+      }
+
+      if (/^BEGIN\s+TRANSACTION\s*;?$/.test(normalized)) {
+        pendingTransaction = [statementSql];
+        return;
+      }
+
+      await writeGroup([statementSql]);
+    },
+
+    async close() {
+      if (pendingTransaction) {
+        await writeGroup(pendingTransaction);
+        pendingTransaction = null;
+      }
+      if (chunkStream) {
+        chunkStream.end();
+        await finished(chunkStream);
+      }
+      return { chunks: chunkIndex, statements: totalStatements };
+    }
+  };
+
+  async function writeGroup(group) {
     const groupSql = group.join('');
     const groupBytes = Buffer.byteLength(groupSql, 'utf8');
     const groupStatements = group.length;
     const exceedsLimit =
-      current.length > 0 &&
-      (currentStatements + groupStatements > options.maxStatements ||
-        currentBytes + groupBytes > options.maxBytes);
+      chunkStream &&
+      chunkStatements > 0 &&
+      (chunkStatements + groupStatements > limits.maxStatements || chunkBytes + groupBytes > limits.maxBytes);
 
-    if (exceedsLimit) flush();
-
-    current.push(groupSql);
-    currentBytes += groupBytes;
-    currentStatements += groupStatements;
-  }
-
-  flush();
-  return chunks;
-
-  function flush() {
-    if (current.length === 0) return;
-    chunks.push(current.join(''));
-    current = [];
-    currentBytes = 0;
-    currentStatements = 0;
-  }
-}
-
-function groupTransactions(statements) {
-  const groups = [];
-  let index = 0;
-
-  while (index < statements.length) {
-    const statement = statements[index];
-    if (!/^BEGIN\s+TRANSACTION\s*;/i.test(statement.trim())) {
-      groups.push([statement]);
-      index += 1;
-      continue;
+    if (exceedsLimit) {
+      chunkStream.end();
+      await finished(chunkStream);
+      chunkStream = null;
+      chunkBytes = 0;
+      chunkStatements = 0;
     }
 
-    const transaction = [statement];
-    index += 1;
-    while (index < statements.length) {
-      transaction.push(statements[index]);
-      const isCommit = /^COMMIT\s*;/i.test(statements[index].trim());
-      index += 1;
-      if (isCommit) break;
+    if (!chunkStream) {
+      chunkIndex += 1;
+      const filename = `chunk-${String(chunkIndex).padStart(4, '0')}.sql`;
+      chunkStream = createWriteStream(join(outputDir, filename), { encoding: 'utf8' });
     }
-    groups.push(transaction);
-  }
 
-  return groups;
+    if (!chunkStream.write(groupSql)) {
+      await new Promise((resolve) => chunkStream.once('drain', resolve));
+    }
+    chunkBytes += groupBytes;
+    chunkStatements += groupStatements;
+    totalStatements += groupStatements;
+  }
 }
