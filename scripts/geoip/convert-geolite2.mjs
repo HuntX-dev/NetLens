@@ -185,14 +185,12 @@ function writeStagingIndexes(out) {
 }
 
 function writeSwap(out) {
-  out.write('BEGIN TRANSACTION;\n');
   out.write('ALTER TABLE geoip_networks RENAME TO geoip_networks_old;\n');
   out.write('ALTER TABLE geoip_asn_networks RENAME TO geoip_asn_networks_old;\n');
   out.write('ALTER TABLE geoip_locations RENAME TO geoip_locations_old;\n');
   out.write(`ALTER TABLE ${TABLES.networks} RENAME TO geoip_networks;\n`);
   out.write(`ALTER TABLE ${TABLES.asnNetworks} RENAME TO geoip_asn_networks;\n`);
   out.write(`ALTER TABLE ${TABLES.locations} RENAME TO geoip_locations;\n`);
-  out.write('COMMIT;\n');
   out.write('DROP TABLE IF EXISTS geoip_networks_old;\n');
   out.write('DROP TABLE IF EXISTS geoip_asn_networks_old;\n');
   out.write('DROP TABLE IF EXISTS geoip_locations_old;\n');

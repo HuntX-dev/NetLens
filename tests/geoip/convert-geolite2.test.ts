@@ -95,8 +95,8 @@ describe('convert-geolite2', () => {
     expect(sql).toContain('ALTER TABLE geoip_asn_networks_next RENAME TO geoip_asn_networks;');
     expect(sql).toContain('ALTER TABLE geoip_locations_next RENAME TO geoip_locations;');
     expect(sql).toContain('DROP TABLE IF EXISTS geoip_networks_old;');
-    expect(sql).toContain('BEGIN TRANSACTION;');
-    expect(sql).toContain('COMMIT;');
+    expect(sql).not.toContain('BEGIN TRANSACTION;');
+    expect(sql).not.toContain('COMMIT;');
     expect(sql).toContain('-- netlens-import total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
     expect(stdout).toContain('Generated GeoIP import: total_rows=5 locations=1 networks=2 asn_networks=2 metadata_rows=1');
     expect(sql).toContain("VALUES ('1.1.1.0/24'");
