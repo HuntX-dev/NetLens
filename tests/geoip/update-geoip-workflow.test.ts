@@ -26,5 +26,10 @@ describe('update geoip workflow', () => {
     expect(workflow).toContain('name: Report import size');
     expect(workflow).toContain('echo "$SUMMARY"');
     expect(workflow).toContain('echo "sql_file_bytes=$SQL_BYTES"');
+    expect(workflow).toContain('node scripts/geoip/split-d1-sql.mjs');
+    expect(workflow).toContain('--output-dir tmp/maxmind/d1-chunks');
+    expect(workflow).toContain('for chunk in tmp/maxmind/d1-chunks/*.sql; do');
+    expect(workflow).toContain('npx wrangler d1 execute netlens-geoip --remote --file="$chunk"');
+    expect(workflow).not.toContain('npx wrangler d1 execute netlens-geoip --remote --file=tmp/maxmind/geoip.sql');
   });
 });

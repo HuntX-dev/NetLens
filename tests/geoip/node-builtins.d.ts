@@ -5,6 +5,7 @@ declare module 'node:child_process' {
 declare module 'node:fs' {
   export function mkdtempSync(prefix: string): string;
   export function readFileSync(path: string, encoding: string): string;
+  export function readdirSync(path: string): string[];
   export function writeFileSync(path: string, data: string): void;
 }
 
